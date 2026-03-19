@@ -2,54 +2,113 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AVM Device Verification</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Audiowide&family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Poppins', sans-serif; background-color: #f0fff4; }
+        
+        .avm-font { font-family: 'Audiowide', cursive; transition: color 1s ease-on-out; }
+
+        /* Initial States */
+        #leftLine, #rightLine { transition: transform 2s ease-out, opacity 1s; opacity: 0; }
+        #centerCircle { transition: background-color 1s, border-color 1s, box-shadow 1s; }
+
+        /* Start Animation State */
+        .animate-lines #leftLine { transform: translateX(100%); opacity: 1; }
+        .animate-lines #rightLine { transform: translateX(-100%); opacity: 1; }
+
+        /* Final States (Success/Fail) */
+        .success #centerCircle { border-color: #10b981; background-color: #ecfdf5; box-shadow: 0 0 30px rgba(16, 185, 129, 0.4); }
+        .success .avm-font { color: #10b981; }
+        .success #status { color: #10b981; }
+
+        .fail #centerCircle { border-color: #ef4444; background-color: #fef2f2; box-shadow: 0 0 30px rgba(239, 68, 68, 0.4); }
+        .fail .avm-font { color: #ef4444; }
+        .fail #status { color: #ef4444; }
+    </style>
 </head>
-<body class="bg-[#f0fff4] flex flex-col items-center justify-center h-screen font-sans">
-    <div class="bg-white p-8 rounded-2xl shadow-lg w-80 text-center border-t-4 border-green-400">
-        <h1 class="text-2xl font-bold text-gray-800 mb-4">Device Verify</h1>
-        <p id="status" class="text-gray-500 mb-6">Checking your hardware...</p>
+<body class="flex flex-col items-center justify-between h-screen p-8 text-center">
+
+    <div class="mt-8">
+        <h1 class="text-xs font-semibold text-gray-400 uppercase tracking-[0.3em]">AVM Device Verification</h1>
+    </div>
+
+    <div id="animationContainer" class="relative w-full h-64 flex items-center justify-center overflow-hidden">
         
-        <div id="loader" class="animate-spin rounded-full h-10 w-10 border-b-2 border-green-500 mx-auto"></div>
+        <div id="leftLine" class="absolute left-[-150px] w-[150px] h-1 bg-gray-200 rounded-full"></div>
         
-        <button id="closeBtn" class="hidden mt-4 bg-green-500 text-white px-6 py-2 rounded-lg" onclick="window.Telegram.WebApp.close()">Close App</button>
+        <div id="centerCircle" class="z-10 relative flex items-center justify-center w-36 h-36 rounded-full border-4 border-gray-200 bg-white shadow-xl transition-all duration-1000">
+            <span class="avm-font text-5xl font-bold text-gray-300">AVM</span>
+        </div>
+
+        <div id="rightLine" class="absolute right-[-150px] w-[150px] h-1 bg-gray-200 rounded-full"></div>
+    </div>
+
+    <div class="mb-12 w-full max-w-sm">
+        <p id="status" class="text-sm font-medium text-gray-600 mb-6 transition-colors duration-1000">Authenticating hardware...</p>
+        
+        <button id="closeBtn" class="hidden w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-3 px-6 rounded-xl shadow-md transition duration-200" onclick="window.Telegram.WebApp.close()">Close App</button>
     </div>
 
     <script>
         const tg = window.Telegram.WebApp;
         tg.expand();
+        tg.enableClosingConfirmation();
 
-        async function startVerification() {
+        async function performVerification() {
+            const container = document.getElementById('animationContainer');
+            
+            // 1. Start Line Animations
+            container.classList.add('animate-lines');
+
+            // 2. Wait for lines to 'merge' (animation time)
+            await new Promise(r => setTimeout(r, 2200)); 
+            
+            // Hide lines after merge
+            document.getElementById('leftLine').style.opacity = '0';
+            document.getElementById('rightLine').style.opacity = '0';
+
             try {
-                // 1. Get IP
+                // Real data fetching
                 const ipRes = await fetch('https://api.ipify.org?format=json');
                 const ipData = await ipRes.json();
-                
-                // 2. Get Device Info (Basic)
-                const device = navigator.platform + " | " + navigator.vendor;
+                const device = navigator.userAgent;
 
-                // 3. Send to Backend
+                // Send to backend
                 const response = await fetch('/api/verify', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        userId: tg.initDataUnsafe.user?.id,
-                        ip: ipData.ip,
-                        device: device
-                    })
+                    body: JSON.stringify({ userId: tg.initDataUnsafe.user?.id, ip: ipData.ip, device: device })
                 });
 
                 const result = await response.json();
-                document.getElementById('loader').classList.add('hidden');
-                document.getElementById('status').innerText = result.message;
+
+                // 3. Apply Final State (Success or Fail)
+                if (result.status === 'success') {
+                    container.classList.add('success');
+                    document.getElementById('status').innerText = "Verification Successful! Your rewards are now active.";
+                } else {
+                    container.classList.add('fail');
+                    document.getElementById('status').innerText = result.message; // e.g., Device already registered!
+                }
+
+                // Show Close Button
                 document.getElementById('closeBtn').classList.remove('hidden');
 
             } catch (err) {
-                document.getElementById('status').innerText = "Error: Check connection";
+                container.classList.add('fail');
+                document.getElementById('status').innerText = "Network Error: Could not verify device.";
+                document.getElementById('closeBtn').classList.remove('hidden');
             }
         }
 
-        window.onload = startVerification;
+        // Start animation loop on page load
+        window.onload = performVerification;
     </script>
 </body>
 </html>
