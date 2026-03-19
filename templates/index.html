@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body class="bg-[#f0fff4] flex flex-col items-center justify-center h-screen font-sans">
+    <div class="bg-white p-8 rounded-2xl shadow-lg w-80 text-center border-t-4 border-green-400">
+        <h1 class="text-2xl font-bold text-gray-800 mb-4">Device Verify</h1>
+        <p id="status" class="text-gray-500 mb-6">Checking your hardware...</p>
+        
+        <div id="loader" class="animate-spin rounded-full h-10 w-10 border-b-2 border-green-500 mx-auto"></div>
+        
+        <button id="closeBtn" class="hidden mt-4 bg-green-500 text-white px-6 py-2 rounded-lg" onclick="window.Telegram.WebApp.close()">Close App</button>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+
+        async function startVerification() {
+            try {
+                // 1. Get IP
+                const ipRes = await fetch('https://api.ipify.org?format=json');
+                const ipData = await ipRes.json();
+                
+                // 2. Get Device Info (Basic)
+                const device = navigator.platform + " | " + navigator.vendor;
+
+                // 3. Send to Backend
+                const response = await fetch('/api/verify', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        userId: tg.initDataUnsafe.user?.id,
+                        ip: ipData.ip,
+                        device: device
+                    })
+                });
+
+                const result = await response.json();
+                document.getElementById('loader').classList.add('hidden');
+                document.getElementById('status').innerText = result.message;
+                document.getElementById('closeBtn').classList.remove('hidden');
+
+            } catch (err) {
+                document.getElementById('status').innerText = "Error: Check connection";
+            }
+        }
+
+        window.onload = startVerification;
+    </script>
+</body>
+</html>
