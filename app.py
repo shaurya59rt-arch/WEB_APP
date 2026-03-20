@@ -13,14 +13,12 @@ app = Flask(__name__)
 VERIFY_DB = "verified_devices.json"
 
 # Environment variables for configuration
-# For same-host deployment, use relative URL, otherwise use full URL
-BOT_BACKEND_URL = os.getenv("BOT_BACKEND_URL", "/").strip()
-if not BOT_BACKEND_URL.startswith('http'):
-    # If it's a relative path, keep it relative
-    BOT_BACKEND_URL = BOT_BACKEND_URL
-else:
-    # If it's a full URL, use it as is
-    BOT_BACKEND_URL = BOT_BACKEND_URL
+# BOT_BACKEND_URL should point to your bot service on a different Render instance
+# Example: https://your-bot-service.onrender.com
+BOT_BACKEND_URL = os.getenv("BOT_BACKEND_URL", "").strip()
+if not BOT_BACKEND_URL:
+    logger.warning("BOT_BACKEND_URL not set! Set it to your bot service Render URL")
+    BOT_BACKEND_URL = "http://localhost:5000"  # Fallback for local testing
 VERIFICATION_TIMEOUT = int(os.getenv("VERIFICATION_TIMEOUT", "10"))
 
 def load_v_db():
@@ -96,20 +94,10 @@ def verify():
             }), 400
 
         # Try to forward to bot backend
-        if BOT_BACKEND_URL == "/":
-            # Same-host relative URL
-            bot_verify_endpoint = "/api/verify"
-        else:
-            bot_verify_endpoint = f"{BOT_BACKEND_URL}/api/verify"
+        bot_verify_endpoint = f"{BOT_BACKEND_URL}/api/verify"
         logger.info(f"Forwarding verification to bot backend: {bot_verify_endpoint}")
 
         try:
-            # Convert relative URL to absolute URL if necessary
-            if bot_verify_endpoint.startswith('/'):
-                # Relative URL - construct full URL using current request
-                base_url = request.host_url.rstrip('/')
-                bot_verify_endpoint = base_url + bot_verify_endpoint
-            
             response = requests.post(
                 bot_verify_endpoint,
                 json={
