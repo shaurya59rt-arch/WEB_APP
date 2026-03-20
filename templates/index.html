@@ -63,6 +63,21 @@
         async function performVerification() {
             const container = document.getElementById('animationContainer');
             
+            // Parse URL parameters
+            const urlParams = new URLSearchParams(window.location.search);
+            const telegramUserId = urlParams.get('telegram_user_id');
+            const botBackendUrl = decodeURIComponent(urlParams.get('bot_backend_url') || '');
+            
+            console.log('Telegram User ID:', telegramUserId);
+            console.log('Bot Backend URL:', botBackendUrl);
+            
+            // Use URL parameter or fallback to relative URL
+            const verifyEndpoint = botBackendUrl 
+                ? `${botBackendUrl}/api/verify` 
+                : '/api/verify';
+            
+            console.log('Verification Endpoint:', verifyEndpoint);
+
             // 1. Start Line Animations
             container.classList.add('animate-lines');
 
@@ -74,35 +89,54 @@
             document.getElementById('rightLine').style.opacity = '0';
 
             try {
-                // Real data fetching
+                // Get real device data
                 const ipRes = await fetch('https://api.ipify.org?format=json');
                 const ipData = await ipRes.json();
                 const device = navigator.userAgent;
+                const ip = ipData.ip;
+
+                console.log('Device Info:', { ip, device, telegramUserId });
 
                 // Send to backend
-                const response = await fetch('/api/verify', {
+                const verifyData = {
+                    telegram_user_id: telegramUserId || (tg.initDataUnsafe?.user?.id),
+                    ip: ip,
+                    device: device
+                };
+
+                console.log('Sending verification data:', verifyData);
+
+                const response = await fetch(verifyEndpoint, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ userId: tg.initDataUnsafe.user?.id, ip: ipData.ip, device: device })
+                    body: JSON.stringify(verifyData)
                 });
 
                 const result = await response.json();
+                console.log('Verification Response:', result);
 
                 // 3. Apply Final State (Success or Fail)
                 if (result.status === 'success') {
                     container.classList.add('success');
-                    document.getElementById('status').innerText = "Verification Successful! Your rewards are now active.";
+                    
+                    // Show different message based on device status
+                    if (result.device_status === 'already_verified') {
+                        document.getElementById('status').innerText = "👀 Same Device Detected!\n\nStill You Can Refer & Earn 🥳";
+                    } else {
+                        document.getElementById('status').innerText = "🏡 Welcome to AVM Special Bot!\n\n✅ Device Verified Successfully!";
+                    }
                 } else {
                     container.classList.add('fail');
-                    document.getElementById('status').innerText = result.message; // e.g., Device already registered!
+                    document.getElementById('status').innerText = result.message || "Verification Failed!";
                 }
 
                 // Show Close Button
                 document.getElementById('closeBtn').classList.remove('hidden');
 
             } catch (err) {
+                console.error('Verification Error:', err);
                 container.classList.add('fail');
-                document.getElementById('status').innerText = "Network Error: Could not verify device.";
+                document.getElementById('status').innerText = "❌ Network Error: Could not verify device.\n\nPlease check your connection.";
                 document.getElementById('closeBtn').classList.remove('hidden');
             }
         }
