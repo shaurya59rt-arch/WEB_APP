@@ -66,15 +66,26 @@
             // Parse URL parameters
             const urlParams = new URLSearchParams(window.location.search);
             const telegramUserId = urlParams.get('telegram_user_id');
-            const botBackendUrl = decodeURIComponent(urlParams.get('bot_backend_url') || '');
+            // Try query param (from Telegram button URL) then fallback to env value injected by Flask
+            const queryBotBackendUrl = decodeURIComponent(urlParams.get('bot_backend_url') || '');
+            const envBotBackendUrl = '{{ bot_backend_url }}'.trim();
+            const botBackendUrl = queryBotBackendUrl || envBotBackendUrl;
             
             console.log('Telegram User ID:', telegramUserId);
             console.log('Bot Backend URL:', botBackendUrl);
             
-            // Use URL parameter or fallback to relative URL
+            // Use backend url or fail early if missing
             const verifyEndpoint = botBackendUrl 
                 ? `${botBackendUrl}/api/verify` 
-                : '/api/verify';
+                : null;
+
+            if (!verifyEndpoint) {
+                console.error('No bot backend URL configured');
+                document.getElementById('animationContainer').classList.add('fail');
+                document.getElementById('status').innerText = '❌ Bot backend URL not configured.';
+                document.getElementById('closeBtn').classList.remove('hidden');
+                return;
+            }
             
             console.log('Verification Endpoint:', verifyEndpoint);
 
