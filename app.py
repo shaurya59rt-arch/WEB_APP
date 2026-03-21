@@ -43,7 +43,7 @@ def save_v_db(data):
 @app.route('/')
 def index():
     """Serve the verification page"""
-    return render_template('index.html')
+    return render_template('index.html', bot_backend_url=BOT_BACKEND_URL)
 
 @app.route('/health', methods=['GET'])
 def health_check():
